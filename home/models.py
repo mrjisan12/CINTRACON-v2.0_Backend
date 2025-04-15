@@ -1,0 +1,49 @@
+from django.db import models
+from django.contrib.auth.models import User
+from cloudinary.models import CloudinaryField
+
+# Post Model
+class Post(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts")
+    caption = models.TextField(null=True, blank=True)
+    post_image = CloudinaryField('post_image', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Post by {self.user.username} on {self.created_at}"
+
+    class Meta:
+        ordering = ['-created_at']  # Posts are ordered by creation time (newest first)
+
+
+# Reaction Model
+class Reaction(models.Model):
+    REACTION_CHOICES = [
+        ('like', 'Like'),
+        ('love', 'Love'),
+        ('wow', 'Wow'),
+        ('sad', 'Sad'),
+        ('angry', 'Angry'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='reactions')
+    reaction_type = models.CharField(max_length=10, choices=REACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'post', 'reaction_type']  # A user can only react with one reaction type per post
+
+    def __str__(self):
+        return f"{self.user.username} reacted with {self.reaction_type} on post {self.post.id}"
+
+
+# Comment Model
+class Comment(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Comment by {self.user.username} on post {self.post.id}"
