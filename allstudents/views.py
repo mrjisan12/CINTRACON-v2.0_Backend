@@ -8,6 +8,8 @@ from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count, Prefetch
 from rest_framework.pagination import PageNumberPagination
 
+# Without dept and semester filter and paginations
+
 # class AllStudentsAPIView(APIView):
 #     permission_classes = [IsAuthenticated]
     

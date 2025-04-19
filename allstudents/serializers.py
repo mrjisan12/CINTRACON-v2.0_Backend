@@ -3,6 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from users.models import UserProfile
 
+# Student Profile Serializers for All Students API
 class StudentProfileSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(source='user.first_name')
     last_name = serializers.CharField(source='user.last_name')

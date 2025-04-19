@@ -84,6 +84,7 @@ class PostSerializer(serializers.ModelSerializer):
         return post
 
 
+# Trying to add field post_detail in NewsFeed API
 
 # class PostSerializer(serializers.ModelSerializer):
 #     reaction = serializers.SerializerMethodField()
