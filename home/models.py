@@ -1,6 +1,10 @@
 from django.db import models
-from django.contrib.auth.models import User
+# from django.contrib.auth.models import User
 from cloudinary.models import CloudinaryField
+from django.contrib.auth import get_user_model
+
+# Get the custom user model
+User = get_user_model()
 
 # Post Model
 class Post(models.Model):
@@ -10,7 +14,7 @@ class Post(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Post by {self.user.username} on {self.created_at}"
+        return f"Post by {self.user.full_name} on {self.created_at}"
 
     class Meta:
         ordering = ['-created_at']  # Posts are ordered by creation time (newest first)
@@ -35,7 +39,7 @@ class Reaction(models.Model):
         unique_together = ['user', 'post', 'reaction_type']  # A user can only react with one reaction type per post
 
     def __str__(self):
-        return f"{self.user.username} reacted with {self.reaction_type} on post {self.post.id}"
+        return f"{self.user.full_name} reacted with {self.reaction_type} on post {self.post.id}"
 
 
 # Comment Model
@@ -46,4 +50,4 @@ class Comment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Comment by {self.user.username} on post {self.post.id}"
+        return f"Comment by {self.user.full_name} on post {self.post.id}"

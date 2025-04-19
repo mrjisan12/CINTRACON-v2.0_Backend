@@ -2,17 +2,20 @@
 import cloudinary.uploader
 from rest_framework import serializers
 from .models import Post, Reaction, Comment
-from django.contrib.auth.models import User
+#from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+
+# Get the custom user model
+User = get_user_model()
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField()
-    last_name = serializers.CharField()
+    full_name = serializers.CharField()
     profile_photo = serializers.CharField(source='profile.profile_photo.url', allow_null=True)
 
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'profile_photo']
+        fields = ['full_name', 'profile_photo']
 
 
 
@@ -22,13 +25,12 @@ class ReactionSerializer(serializers.ModelSerializer):
         fields = ['reaction_type', 'created_at']
 
 class CommentSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(source='user.first_name')
-    last_name = serializers.CharField(source='user.last_name')
+    full_name = serializers.CharField(source='user.full_name')
     profile_photo = serializers.CharField(source='user.profile.profile_photo.url', allow_null=True)
 
     class Meta:
         model = Comment
-        fields = ['user', 'first_name', 'last_name', 'profile_photo', 'content', 'created_at']
+        fields = ['user', 'full_name', 'profile_photo', 'content', 'created_at']
 
 
 class PostSerializer(serializers.ModelSerializer):

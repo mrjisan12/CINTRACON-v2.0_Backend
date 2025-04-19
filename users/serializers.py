@@ -11,17 +11,15 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     confirm_password = serializers.CharField(write_only=True)
     batch_no = serializers.IntegerField(write_only=True)
     profile_photo = serializers.ImageField(required=False, write_only=True)
-    department = serializers.ChoiceField(choices=UserProfile.DEPARTMENTS, write_only=True)  # Add department
-    semester = serializers.ChoiceField(choices=UserProfile.SEMESTERS, write_only=True)  # Add semester
-    section = serializers.ChoiceField(choices=UserProfile.SECTIONS, write_only=True)  # Add Section
-
+    department = serializers.ChoiceField(choices=UserProfile.DEPARTMENTS, write_only=True)
+    semester = serializers.ChoiceField(choices=UserProfile.SEMESTERS, write_only=True)
+    section = serializers.ChoiceField(choices=UserProfile.SECTIONS, write_only=True)
 
     class Meta:
         model = User
-        fields = ['username', 'first_name', 'last_name', 'email', 'password', 'confirm_password', 'batch_no', 'profile_photo', 'department', 'semester','section']
+        fields = ['full_name', 'email', 'password', 'confirm_password', 'batch_no', 'profile_photo', 'department', 'semester', 'section']
 
     def validate(self, attrs):
-        # Check if passwords match
         if attrs['password'] != attrs['confirm_password']:
             raise ValidationError({'confirm_password': 'Passwords do not match.'})
         return attrs
@@ -37,34 +35,30 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
         # Create user instance
         user = User.objects.create_user(
-            username=validated_data['username'],
             email=validated_data['email'],
+            full_name=validated_data['full_name'],
             password=validated_data['password'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name']
         )
 
-        # Prepare profile data from validated_data
+        # Create user profile
         profile_data = {
             'user': user,
             'batch_no': batch_no,
             'department': department,
             'semester': semester,
             'section': section,
-            'role': validated_data.get('role', 'student'),  # This will now come from form, default is 'student'
-            'points': 10 ,
+            'role': 'student',  # Default role
+            'points': 10,  # Default points
         }
 
-        # Upload profile photo to Cloudinary if provided
         if profile_photo:
             cloudinary_response = upload(profile_photo)
             profile_data['profile_photo'] = cloudinary_response['secure_url']
 
-        # Create UserProfile
         UserProfile.objects.create(**profile_data)
 
         return user
-    
+
     
 class UserProfileSerializer(serializers.ModelSerializer):
     profile_img = serializers.ImageField(required=False)
@@ -99,7 +93,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
             profile_photo=profile_img_url if profile_img else None,
             cover_photo=validated_data.get('cover_photo', None),
             points = 10,
-            section = validated_data['section']  # ডিফল্ট 'A'
+            section = validated_data['section'],  # ডিফল্ট 'A'
+            facebook_link = validated_data['facebook_link'],
+            instagram_link = validated_data['instagram_link'],
+            linkedin_link = validated_data['linkedin_link'],
            
         )
         

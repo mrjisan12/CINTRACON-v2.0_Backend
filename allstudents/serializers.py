@@ -1,12 +1,15 @@
 # serializers.py
 from rest_framework import serializers
-from django.contrib.auth.models import User
+# from django.contrib.auth.models import User
 from users.models import UserProfile
+from django.contrib.auth import get_user_model 
+
+# Get the custom user model
+User = get_user_model()
 
 # Student Profile Serializers for All Students API
 class StudentProfileSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(source='user.first_name')
-    last_name = serializers.CharField(source='user.last_name')
+    full_name = serializers.CharField(source='user.full_name')
     email = serializers.EmailField(source='user.email')
     total_post = serializers.SerializerMethodField()  # Key declaration
     profile_photo = serializers.SerializerMethodField() 
@@ -15,8 +18,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = [
             'id',
-            'first_name', 
-            'last_name',
+            'full_name',
             'email',
             'department',
             'semester',
@@ -24,7 +26,10 @@ class StudentProfileSerializer(serializers.ModelSerializer):
             'points',
             'section',
             'profile_photo',
-            'total_post'
+            'total_post',
+            'facebook_link',
+            'instagram_link',
+            'linkedin_link'
         ]
     
     def get_profile_photo(self, obj):

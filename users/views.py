@@ -23,8 +23,14 @@ class UserRegistrationView(APIView):
                 'msg': 'User successfully registered!',
                 'success': True,
                 'data': {
-                    'refreshToken': str(refresh),
-                    'accessToken': str(refresh.access_token)
+                    'user': {  # Include user details (full_name and email)
+                        'full_name': user.full_name,
+                        'email': user.email
+                    },
+                    'accessToken': str(refresh.access_token),
+                    'refreshToken': str(refresh)
+                    
+                    
                 },
                 'code': 201
             })
@@ -53,8 +59,13 @@ class UserLoginView(APIView):
                     'msg': 'User successfully logged in!',
                     'success': True,
                     'data': {
-                        'refreshToken': str(refresh),
-                        'accessToken': str(refresh.access_token)
+                        'user': {  # Include user details (full_name and email)
+                        'full_name': user.full_name,
+                        'email': user.email
+                    },
+                        'accessToken': str(refresh.access_token),
+                        'refreshToken': str(refresh)
+                        
                     },
                     'code': 200
                 })
