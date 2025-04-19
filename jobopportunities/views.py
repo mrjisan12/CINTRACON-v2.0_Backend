@@ -34,3 +34,6 @@ class JobPostListView(APIView):
             'success': True,
             'data': serializer.data
         }, status=status.HTTP_200_OK)
+        
+        
+        

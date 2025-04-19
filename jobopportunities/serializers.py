@@ -21,13 +21,23 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class JobPostSerializer(serializers.ModelSerializer):
     
     user = UserProfileSerializer(read_only=True)
-    
+    job_post_image = serializers.SerializerMethodField()
     
     class Meta:
         model = JobPost
         fields = ['id', 'title', 'description', 'company_name', 'salary', 'place', 'start_time', 'end_time', 'apply_link', 'job_post_image', 'deadline', 'user' ,'created_at']
         read_only_fields = ['user', 'created_at']  # Prevent modification of created_at or user
 
+    
+    def get_job_post_image(self, obj):
+        if obj.job_post_image:
+            # Remove 'image/upload/' prefix if it exists
+            url = str(obj.job_post_image)
+            if 'image/upload/' in url:
+                url = url.replace('image/upload/', '')
+            return url
+        return None
+    
     def create(self, validated_data):
         user = self.context['request'].user
         job_image = self.context['request'].FILES.get('job_post_image')

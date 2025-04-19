@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'home',
     'allstudents',
     'jobopportunities',
+    'notesharing',
 ]
 
 AUTH_USER_MODEL = 'users.CustomUser'
