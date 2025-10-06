@@ -32,23 +32,28 @@ class JobPostCreateView(APIView):
 
 
 class JobPostListView(APIView):
-    def get(self, request):
-        # Get all job posts (you can add pagination here for large datasets)
-        job_posts = JobPost.objects.all().order_by('-created_at')
-        
-        # Paginate the queryset
-        paginator = JobPostPagination()
-        result_page = paginator.paginate_queryset(job_posts, request)
-        
-        serializer = JobPostSerializer(result_page, many=True)
-        return paginator.get_paginated_response(
-            {
-                'msg': 'Job posts fetched successfully!',
-                'success': True,
-                'data': serializer.data,
-                'code': 200
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .utils import api_response
+        try:
+            page = int(request.data.get('page', 1))
+            size = int(request.data.get('size', 10))
+            job_posts = JobPost.objects.all().order_by('-created_at')
+            total = job_posts.count()
+            start = (page - 1) * size
+            end = start + size
+            paginated = job_posts[start:end]
+            serializer = JobPostSerializer(paginated, many=True)
+            data = {
+                'results': serializer.data,
+                'total': total,
+                'page': page,
+                'size': size
             }
-        )
+            return api_response(True, 'Job posts fetched successfully!', data, 200, status.HTTP_200_OK)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         
         

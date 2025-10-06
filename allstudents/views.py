@@ -7,6 +7,7 @@ from .serializers import StudentProfileSerializer
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count, Prefetch
 from rest_framework.pagination import PageNumberPagination
+from users.utils import api_response
 
 # Without dept and semester filter and paginations
 
@@ -36,9 +37,11 @@ from rest_framework.pagination import PageNumberPagination
 # New Optimized Code with dept and semester filter
 # views.py (Optimized Query)
 
+
 class StudentPagination(PageNumberPagination):
-    page_size = 20  # Default page size
-    page_size_query_param = 'page_size'
+    page_size = 20
+    page_size_query_param = 'size'
+    page_query_param = 'page'
     max_page_size = 100
 
 class AllStudentsAPIView(APIView):
@@ -46,36 +49,37 @@ class AllStudentsAPIView(APIView):
     pagination_class = StudentPagination
 
     def post(self, request):
-        department = request.data.get('department', 'cse')  # Default to CSE
-        semester = request.data.get('semester')  # Optional filter
-        
-        # Base queryset with optimizations
-        queryset = UserProfile.objects.filter(
-            role='student',
-            department=department
-        ).select_related('user').only(
-            'department', 'semester', 'batch_no', 
-            'points', 'section', 'profile_photo',
-            'user__first_name', 'user__last_name', 'user__email'
-        )
-        
-        if semester:
-            queryset = queryset.filter(semester=semester)
-        
-        # Annotate post count
-        queryset = queryset.annotate(
-            total_post=Count('user__posts', distinct=True)
-        )
-        
-        # Paginate results
-        paginator = self.pagination_class()
-        page = paginator.paginate_queryset(queryset, request)
-        
-        serializer = StudentProfileSerializer(page, many=True)
-        
-        return paginator.get_paginated_response({
-            "msg": f"All {department.upper()} Students Retrieved",
-            "success": True,
-            "data": serializer.data,
-            "code": 200
-        })
+        try:
+            # Filters
+            department = request.data.get('department')
+            semester = request.data.get('semester')
+            search = request.data.get('search')
+            page = int(request.data.get('page', 1))
+            size = int(request.data.get('size', 10))
+
+            queryset = UserProfile.objects.filter(role='student').select_related('user')
+            if department:
+                queryset = queryset.filter(department=department)
+            if semester:
+                queryset = queryset.filter(semester=semester)
+            if search:
+                queryset = queryset.filter(user__full_name__icontains=search)
+
+            queryset = queryset.annotate(total_post=Count('user__posts', distinct=True))
+
+            # Manual pagination (like newsfeed)
+            total = queryset.count()
+            start = (page - 1) * size
+            end = start + size
+            paginated = queryset[start:end]
+
+            serializer = StudentProfileSerializer(paginated, many=True)
+            data = {
+                'results': serializer.data,
+                'total': total,
+                'page': page,
+                'size': size
+            }
+            return api_response(True, 'Students fetched successfully!', data, 200, status.HTTP_200_OK)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
