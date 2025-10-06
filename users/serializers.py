@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from cloudinary.uploader import upload
 from .models import UserProfile
 from django.core.exceptions import ValidationError
+from .models import UserVerification
 
 User = get_user_model()
 
@@ -97,7 +98,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             facebook_link = validated_data['facebook_link'],
             instagram_link = validated_data['instagram_link'],
             linkedin_link = validated_data['linkedin_link'],
-           
+    
         )
         
         
@@ -131,3 +132,25 @@ class LoginSerializer(serializers.Serializer):
             return attrs
         
         raise ValidationError('Invalid email or password.')
+    
+    
+    
+    
+    
+class SendOtpSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class CheckOtpSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp_code = serializers.CharField(max_length=6)
+
+class PasswordResetSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    new_password = serializers.CharField(write_only=True)
+    new_password_confirmation = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['new_password_confirmation']:
+            raise serializers.ValidationError({'new_password_confirmation': 'Passwords do not match.'})
+        return attrs
+

@@ -35,14 +35,14 @@ class CommentSerializer(serializers.ModelSerializer):
 
 class PostSerializer(serializers.ModelSerializer):
     reaction = serializers.SerializerMethodField()
-    comments = serializers.SerializerMethodField()
+    # comments = serializers.SerializerMethodField()
     total_comments = serializers.SerializerMethodField()
     post_image = serializers.SerializerMethodField()
     user = UserProfileSerializer(read_only=True)
 
     class Meta:
         model = Post
-        fields = ['id', 'user', 'caption', 'post_image', 'reaction', 'comments', 'total_comments', 'created_at']
+        fields = ['id', 'user', 'caption', 'post_image', 'reaction', 'total_comments', 'created_at']
 
     def get_post_image(self, obj):
         if obj.post_image:
@@ -58,9 +58,9 @@ class PostSerializer(serializers.ModelSerializer):
         }
         return reaction_counts
 
-    def get_comments(self, obj):
-        comments = obj.comments.all().order_by('-created_at')[:2]
-        return CommentSerializer(comments, many=True).data
+    # def get_comments(self, obj):
+    #     comments = obj.comments.all().order_by('-created_at')[:2]
+    #     return CommentSerializer(comments, many=True).data
 
     def get_total_comments(self, obj):
         return obj.comments.count()

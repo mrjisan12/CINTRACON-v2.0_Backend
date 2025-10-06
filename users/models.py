@@ -1,3 +1,4 @@
+
 from django.db import models
 from django.contrib.auth.models import User
 from cloudinary.models import CloudinaryField
@@ -97,3 +98,27 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f'{self.user.full_name} - Profile'
+
+
+
+
+class UserVerification(models.Model):
+    email = models.EmailField()
+    otp_code = models.CharField(max_length=6)
+    expired_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.email} - {self.otp_code}"
+
+
+# Pivot table for user points history
+class UserPoints(models.Model):
+    user = models.ForeignKey('CustomUser', on_delete=models.CASCADE, related_name='points_history')
+    points = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.points} points at {self.created_at}"

@@ -1,10 +1,17 @@
+
+# home/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from users.models import CustomUser, UserProfile, UserPoints
+from users.utils import api_response
+from django.utils import timezone
+from datetime import timedelta
 from .models import *
 from .serializers import *
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
+from django.db.models import Sum
 
 class PostPagination(PageNumberPagination):
     page_size = 10  # Adjust to the number of posts you want per request
@@ -51,28 +58,79 @@ class PostCreateView(APIView):
 #             }, status=status.HTTP_200_OK)
         
         
+
 class PostListView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        # Get all posts along with their reactions and comments
-        posts = Post.objects.all()
+    def post(self, request):
+        # Get page and size from request body, default to 1 and 10
+        page = int(request.data.get('page', 1))
+        size = int(request.data.get('size', 10))
+
+        posts = Post.objects.all().order_by('-created_at')
+        total_posts = posts.count()
+        start = (page - 1) * size
+        end = start + size
+        paginated_posts = posts[start:end]
+
+        serializer = PostSerializer(paginated_posts, many=True)
+
+        return Response({
+            'msg': 'Posts retrieved successfully!',
+            'success': True,
+            'data': serializer.data,
+            'code': 200
+        }, status=status.HTTP_200_OK)
         
-        # Paginate the queryset
-        paginator = PostPagination()
-        result_page = paginator.paginate_queryset(posts, request)
         
-        # Serialize the paginated posts
-        serializer = PostSerializer(result_page, many=True)
-        
-        return paginator.get_paginated_response(
-            {
-                'msg': 'Posts retrieved successfully!',
-                'success': True,
-                'data': serializer.data,
-                'code': 200
+# Post Details API
+class PostDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, post_id):
+        from users.utils import api_response
+        try:
+            post = Post.objects.select_related('user').get(id=post_id)
+            # User info
+            user_profile = post.user.profile
+            user_info = {
+                'full_name': post.user.full_name,
+                'profile_photo': user_profile.profile_photo.url if user_profile.profile_photo else None
             }
-        )
+            # Reactions
+            reaction_counts = {
+                "like": post.reactions.filter(reaction_type="like").count(),
+                "love": post.reactions.filter(reaction_type="love").count(),
+                "sad": post.reactions.filter(reaction_type="sad").count(),
+                "angry": post.reactions.filter(reaction_type="angry").count(),
+            }
+            # Comments
+            comments_qs = post.comments.all().order_by('-created_at')
+            comments = [
+                {
+                    'user': c.user.id,
+                    'full_name': c.user.full_name,
+                    'profile_photo': c.user.profile.profile_photo.url if c.user.profile.profile_photo else None,
+                    'content': c.content,
+                    'created_at': c.created_at
+                }
+                for c in comments_qs
+            ]
+            data = {
+                'id': post.id,
+                'user': user_info,
+                'caption': post.caption,
+                'post_image': str(post.post_image) if post.post_image else None,
+                'reaction': reaction_counts,
+                'total_comments': post.comments.count(),
+                'comments': comments,
+                'created_at': post.created_at
+            }
+            return api_response(True, 'Post details fetched successfully!', data, 200, status.HTTP_200_OK)
+        except Post.DoesNotExist:
+            return api_response(False, 'Post not found', None, 404, status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         
 # For Create Comment API        
@@ -169,3 +227,76 @@ class PostAllCommentsView(APIView):
             },
             "code": 200
         }, status=status.HTTP_200_OK)
+        
+        
+# Right Sidebar Info
+class RightSidebarInfoView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            user = request.user
+            # Get user info
+            user_profile = UserProfile.objects.get(user=user)
+            # user_info = {
+            #     'full_name': user.full_name,
+            #     'profile_photo': user_profile.profile_photo.url if user_profile.profile_photo else None,
+            #     'department': user_profile.department,
+            #     'semester': user_profile.semester,
+            # }
+
+            # Get top 10 users by points in last 7 days
+            seven_days_ago = timezone.now() - timedelta(days=7)
+            # Aggregate points for each user in last 7 days
+            points_qs = UserPoints.objects.filter(created_at__gte=seven_days_ago)
+            leaderboard = (
+                points_qs.values('user')
+                .annotate(total_points=Sum('points'))
+                .order_by('-total_points')[:10]
+            )
+            # Get user info for leaderboard
+            user_ids = [entry['user'] for entry in leaderboard]
+            users = CustomUser.objects.filter(id__in=user_ids)
+            profiles = UserProfile.objects.filter(user_id__in=user_ids)
+            user_map = {u.id: u for u in users}
+            profile_map = {p.user_id: p for p in profiles}
+            leaderboard_data = []
+            for entry in leaderboard:
+                uid = entry['user']
+                u = user_map.get(uid)
+                p = profile_map.get(uid)
+                leaderboard_data.append({
+                    'full_name': u.full_name if u else None,
+                    'profile_photo': p.profile_photo.url if p and p.profile_photo else None,
+                    'department': p.department if p else None,
+                    'semester': p.semester if p else None,
+                    'total_points': entry['total_points']
+                })
+
+            data = {
+                # 'user_info': user_info,
+                'top_users': leaderboard_data
+            }
+            return api_response(True, 'Sidebar info fetched successfully!', data, 200, status.HTTP_200_OK)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+# Nav Bar Info
+class NavBarInfoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            user_profile = UserProfile.objects.get(user=user)
+            data = {
+                'full_name': user.full_name,
+                'profile_photo': user_profile.profile_photo.url if user_profile.profile_photo else None,
+                'points': user_profile.points
+            }
+            from users.utils import api_response
+            return api_response(True, 'Nav bar info fetched successfully!', data, 200, status.HTTP_200_OK)
+        except Exception as e:
+            from users.utils import api_response
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
