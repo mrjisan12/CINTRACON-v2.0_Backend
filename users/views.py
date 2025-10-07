@@ -4,10 +4,10 @@ from .utils import api_response
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
 from .serializers import *
-from .serializers import SendOtpSerializer, CheckOtpSerializer, PasswordResetSerializer
+from .serializers import *
 from .models import UserVerification
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.utils import timezone
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
@@ -15,6 +15,7 @@ import random
 from datetime import timedelta
 from django.template.loader import render_to_string
 from .models import UserProfile, UserPoints, CustomUser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 
 
@@ -160,9 +161,13 @@ class UserLoginView(APIView):
         except Exception as e:
             return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-        
-        
-        
+# For Logout
+class UserLogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # Access token long-lived hole backend e blacklist optional
+        return api_response(True, "Logged out successfully.",None, status.HTTP_200_OK)
 # User Profile Info API
 
 class UserProfileView(APIView):
@@ -199,6 +204,60 @@ class UserProfileView(APIView):
             return api_response(True, 'User profile fetched successfully!', data, 200, status.HTTP_200_OK)
         except Exception as e:
             return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# user profile update API
+class UserProfileUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]  # supports file or json
+
+    def post(self, request):
+        try:
+            profile = UserProfile.objects.get(user=request.user)
+            serializer = UserProfileUpdateSerializer(
+                profile, data=request.data, partial=True, context={'request': request}
+            )
+            if serializer.is_valid():
+                serializer.save()
+
+                profile.refresh_from_db()
+                user = request.user
+
+                data = {
+                    'id': user.id,
+                    'full_name': user.full_name,
+                    'email': user.email,
+                    'department': profile.department,
+                    'semester': profile.semester,
+                    'section': profile.section,
+                    'batch_no': profile.batch_no,
+                    'points': profile.points,
+                    'phone_no': profile.phone_no,
+                    'blood_grp': profile.blood_grp,
+                    'bio': profile.bio,
+                    'relationship_status': profile.relationship_status,
+                    'role': profile.role,
+                    'is_active': user.is_active,
+                    'profile_photo': profile.profile_photo if isinstance(profile.profile_photo, str) else (profile.profile_photo.url if profile.profile_photo else None),
+                    'cover_photo': profile.cover_photo if isinstance(profile.cover_photo, str) else (profile.cover_photo.url if profile.cover_photo else None),
+                    'facebook_link': profile.facebook_link,
+                    'instagram_link': profile.instagram_link,
+                    'linkedin_link': profile.linkedin_link,
+                    'github_link': profile.github_link,
+                }
+                return api_response(True, 'Profile updated successfully!', data, 200, status.HTTP_200_OK)
+
+            return api_response(False, 'Validation error', serializer.errors, 400, status.HTTP_400_BAD_REQUEST)
+
+        except UserProfile.DoesNotExist:
+            return api_response(False, 'User profile not found', None, 404, status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+
 
 class UserProfileByIdView(APIView):
     permission_classes = [AllowAny]

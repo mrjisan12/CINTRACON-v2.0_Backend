@@ -108,6 +108,54 @@ class UserProfileSerializer(serializers.ModelSerializer):
     
     
     
+class UserProfileUpdateSerializer(serializers.ModelSerializer):
+    full_name = serializers.CharField(required=False)
+
+    # only these two accepted as file inputs
+    profile_photo = serializers.ImageField(required=False, write_only=True)
+    cover_photo = serializers.ImageField(required=False, write_only=True)
+
+    class Meta:
+        model = UserProfile
+        fields = [
+            'full_name',
+            'department', 'semester', 'section', 'batch_no',
+            'phone_no', 'blood_grp', 'bio', 'relationship_status',
+            'facebook_link', 'instagram_link', 'linkedin_link', 'github_link',
+            'profile_photo', 'cover_photo',
+        ]
+
+    def update(self, instance: UserProfile, validated_data):
+        request = self.context.get('request')
+        user = request.user if request else instance.user
+
+        # update full name (User model)
+        full_name = validated_data.pop('full_name', None)
+        if full_name:
+            user.full_name = full_name
+            user.save(update_fields=['full_name'])
+
+        # handle profile photo upload
+        new_profile = validated_data.pop('profile_photo', None)
+        if new_profile:
+            cld = upload(new_profile)
+            instance.profile_photo = cld['secure_url']
+
+        # handle cover photo upload
+        new_cover = validated_data.pop('cover_photo', None)
+        if new_cover:
+            cld = upload(new_cover)
+            instance.cover_photo = cld['secure_url']
+
+        # update the rest of profile fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance
+    
+    
+    
 # For Login   
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()

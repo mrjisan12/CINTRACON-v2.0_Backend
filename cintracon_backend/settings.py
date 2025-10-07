@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'allstudents',
     'jobopportunities',
     'notesharing',
+    'corsheaders',
 ]
 
 AUTH_USER_MODEL = 'users.CustomUser'
@@ -77,6 +78,7 @@ SIMPLE_JWT = {
 
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -169,6 +171,14 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+
+
+# Localhost ke allow koro
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",   # React local dev server
+]
+
+CORS_ALLOW_CREDENTIALS = True
 
 
 
