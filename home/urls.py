@@ -10,4 +10,5 @@ urlpatterns = [
     path('post/all-comments/<int:post_id>', PostAllCommentsView.as_view(),name="all_comments"),
     path('right-sidebar-info', RightSidebarInfoView.as_view(), name='right_sidebar_info'),
     path('navbar-info', NavBarInfoView.as_view(), name='nav_bar_info'),
+    path('developers', DeveloperListView.as_view(), name='developers_list'),
 ]

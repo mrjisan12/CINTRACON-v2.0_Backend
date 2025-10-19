@@ -300,3 +300,45 @@ class NavBarInfoView(APIView):
         except Exception as e:
             from users.utils import api_response
             return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+        
+        
+        
+        
+class DeveloperListView(APIView):
+    permission_classes = [IsAuthenticated]  # শুধু authenticated users
+
+    def get(self, request):
+        try:
+            # শুধু developer users গুলো fetch করুন
+            developers = UserProfile.objects.filter(
+                is_developer=True
+            ).select_related('user').order_by('user__id')  # Optimize query
+
+            developers_data = []
+            for profile in developers:
+                developers_data.append({
+                    'id': profile.user.id,
+                    'full_name': profile.user.full_name,
+                    'profile_photo': profile.profile_photo.url if profile.profile_photo else None,
+                    'department': profile.department,
+                    # প্রয়োজন হলে আরও fields যোগ করুন
+                })
+
+            return api_response(
+                True, 
+                'Developers list fetched successfully!', 
+                developers_data, 
+                200, 
+                status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            return api_response(
+                False, 
+                f'Server error: {str(e)}', 
+                None, 
+                500, 
+                status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

@@ -95,6 +95,8 @@ class UserProfile(models.Model):
     instagram_link = models.CharField(max_length=255, null=True, blank=True)
     linkedin_link = models.CharField(max_length=255, null=True, blank=True)
     github_link = models.CharField(max_length=255, null=True, blank=True)
+    is_developer = models.BooleanField(default=False)
+    is_admin = models.BooleanField(default=False)
 
     def __str__(self):
         return f'{self.user.full_name} - Profile'
