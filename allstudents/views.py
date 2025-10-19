@@ -74,12 +74,7 @@ class AllStudentsAPIView(APIView):
             paginated = queryset[start:end]
 
             serializer = StudentProfileSerializer(paginated, many=True)
-            data = {
-                'results': serializer.data,
-                'total': total,
-                'page': page,
-                'size': size
-            }
+            data = serializer.data
             return api_response(True, 'Students fetched successfully!', data, 200, status.HTTP_200_OK)
         except Exception as e:
             return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)

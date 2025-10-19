@@ -15,7 +15,7 @@ class JobPost(models.Model):
     end_time = models.TimeField()
     apply_link = models.CharField(max_length=200)
     job_post_image = CloudinaryField('job_post_image', blank=True, null=True)
-    deadline = models.DateTimeField(blank=True, null=True) 
+    deadline = models.DateField(blank=True, null=True) 
     created_at = models.DateTimeField(auto_now=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='job_posts')
 

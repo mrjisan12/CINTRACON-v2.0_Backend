@@ -15,26 +15,37 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'full_name', 'profile_photo']
 
-
 class NoteSerializer(serializers.ModelSerializer):
     
     user = UserProfileSerializer(read_only=True)
     note_file = serializers.SerializerMethodField()
+    total_downloads = serializers.IntegerField(read_only=True)
     
     class Meta:
         model = Note
         fields = '__all__'
-        read_only_fields = ['uploaded_at']
+        read_only_fields = ['uploaded_at', 'total_downloads', 'user']
         
     def get_note_file(self, obj):
         if obj.note_file:
-            # Remove 'raw/upload/' prefix if it exists
             url = str(obj.note_file)
-            if 'raw/upload/' in url:
-                url = url.replace('raw/upload/', '')
-            # Add .pdf extension if it's missing
-            if not url.endswith('.pdf'):
-                url += '.pdf'
+            
+            # Fix Cloudinary URL format for raw files
+            if 'res.cloudinary.com' in url:
+                # Check if it's missing the proper path structure
+                if '/v' in url and '/raw/upload/' not in url:
+                    # Convert from: https://res.cloudinary.com/djadym7mg/v1760861568/ifbmsd3swgbf2vjyqbnr.pdf
+                    # To: https://res.cloudinary.com/djadym7mg/raw/upload/v1760861568/ifbmsd3swgbf2vjyqbnr.pdf
+                    parts = url.split('/v')
+                    if len(parts) == 2:
+                        base = parts[0]  # https://res.cloudinary.com/djadym7mg
+                        version_and_file = parts[1]  # 1760861568/ifbmsd3swgbf2vjyqbnr.pdf
+                        url = f"{base}/raw/upload/v{version_and_file}"
+                
+                # Remove any existing fl_attachment parameter (causing 401)
+                if 'fl_attachment' in url:
+                    url = url.split('?')[0]  # Remove query parameters
+                    
             return url
         return None
 
@@ -42,7 +53,8 @@ class NoteSerializer(serializers.ModelSerializer):
         note_file = self.context['request'].FILES.get('note_file')
         drive_link = data.get('drive_link')
 
-        if not note_file and not drive_link:
+        # Only validate during creation, not during update
+        if self.instance is None and not note_file and not drive_link:
             raise serializers.ValidationError("Please upload a file or provide a drive link.")
 
         return data
@@ -54,10 +66,21 @@ class NoteSerializer(serializers.ModelSerializer):
 
         if note_file:
             try:
-                cloudinary_response = upload(note_file, resource_type='raw')
+                # Upload with simple configuration (remove flags that cause issues)
+                cloudinary_response = upload(
+                    note_file, 
+                    resource_type='raw',
+                    use_filename=True,
+                    unique_filename=True,
+                    overwrite=True,
+                    folder="notes"
+                    # Remove 'flags' parameter that might cause issues
+                )
                 file_url = cloudinary_response.get('secure_url')
+                print(f"Uploaded file URL: {file_url}")
             except Exception as e:
                 print(f"Cloudinary error: {str(e)}")
+                raise serializers.ValidationError(f"File upload failed: {str(e)}")
 
         note = Note.objects.create(
             title=validated_data['title'],
@@ -66,7 +89,39 @@ class NoteSerializer(serializers.ModelSerializer):
             drive_link=validated_data.get('drive_link'),
             department=validated_data['department'],
             semester=validated_data['semester'],
-            section=validated_data['section'],
+            section=validated_data.get('section', ''),
             user=user,
         )
         return note
+
+    def update(self, instance, validated_data):
+        # Handle file upload if a new file is provided
+        note_file = self.context['request'].FILES.get('note_file')
+        
+        if note_file:
+            try:
+                # Upload new file to Cloudinary
+                cloudinary_response = upload(
+                    note_file, 
+                    resource_type='raw',
+                    use_filename=True,
+                    unique_filename=True,
+                    overwrite=True,
+                    folder="notes"
+                )
+                file_url = cloudinary_response.get('secure_url')
+                instance.note_file = file_url
+            except Exception as e:
+                print(f"Cloudinary error during update: {str(e)}")
+                raise serializers.ValidationError(f"File upload failed: {str(e)}")
+        
+        # Update other fields
+        instance.title = validated_data.get('title', instance.title)
+        instance.description = validated_data.get('description', instance.description)
+        instance.drive_link = validated_data.get('drive_link', instance.drive_link)
+        instance.department = validated_data.get('department', instance.department)
+        instance.semester = validated_data.get('semester', instance.semester)
+        instance.section = validated_data.get('section', instance.section)
+        
+        instance.save()
+        return instance

@@ -49,6 +49,7 @@ class Note(models.Model):
     department = models.CharField(max_length=100, choices=DEPARTMENTS)
     semester = models.CharField(max_length=10, choices=SEMESTERS)
     section = models.CharField(max_length=10, choices=SECTIONS)
+    total_downloads = models.PositiveIntegerField(default=0)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='note_sharing')
 

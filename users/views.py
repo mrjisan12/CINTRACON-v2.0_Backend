@@ -1,5 +1,8 @@
 
 from rest_framework import status
+
+from home.models import Post
+from home.serializers import PostSerializer
 from .utils import api_response
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
@@ -173,12 +176,26 @@ class UserLogoutView(APIView):
 class UserProfileView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request):
+    def post(self, request):
         try:
             user = request.user
             if not user.is_authenticated:
                 return api_response(False, 'Authentication required', None, 401, status.HTTP_401_UNAUTHORIZED)
             user_profile = UserProfile.objects.get(user=user)
+            
+            # Get page and size from request DATA (not query parameters)
+            page = int(request.data.get('page', 1)) if request.data else 1
+            size = int(request.data.get('size', 10)) if request.data else 10
+            
+            # Get user's posts with pagination
+            posts = Post.objects.filter(user=user).order_by('-created_at')
+            total_posts = posts.count()
+            start = (page - 1) * size
+            end = start + size
+            paginated_posts = posts[start:end]
+            
+            post_serializer = PostSerializer(paginated_posts, many=True)
+            
             data = {
                 'id': user.id,
                 'full_name': user.full_name,
@@ -200,11 +217,12 @@ class UserProfileView(APIView):
                 'instagram_link': user_profile.instagram_link,
                 'linkedin_link': user_profile.linkedin_link,
                 'github_link': user_profile.github_link,
+                'posts': post_serializer.data,
+                'total_posts': total_posts,
             }
             return api_response(True, 'User profile fetched successfully!', data, 200, status.HTTP_200_OK)
         except Exception as e:
             return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 # user profile update API
 class UserProfileUpdateView(APIView):
@@ -258,14 +276,27 @@ class UserProfileUpdateView(APIView):
 
 
 
-
 class UserProfileByIdView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, request, user_id):
+    def post(self, request, user_id):
         try:
             user = CustomUser.objects.get(id=user_id)
             user_profile = UserProfile.objects.get(user=user)
+            
+            # Get page and size from request DATA
+            page = int(request.data.get('page', 1)) if request.data else 1
+            size = int(request.data.get('size', 10)) if request.data else 10
+            
+            # Get user's posts with pagination
+            posts = Post.objects.filter(user=user).order_by('-created_at')
+            total_posts = posts.count()
+            start = (page - 1) * size
+            end = start + size
+            paginated_posts = posts[start:end]
+            
+            post_serializer = PostSerializer(paginated_posts, many=True)
+            
             data = {
                 'id': user.id,
                 'full_name': user.full_name,
@@ -287,6 +318,8 @@ class UserProfileByIdView(APIView):
                 'instagram_link': user_profile.instagram_link,
                 'linkedin_link': user_profile.linkedin_link,
                 'github_link': user_profile.github_link,
+                'posts': post_serializer.data,
+                'total_posts': total_posts,
             }
             return api_response(True, 'User profile fetched successfully!', data, 200, status.HTTP_200_OK)
         except CustomUser.DoesNotExist:
