@@ -326,3 +326,8 @@ class UserProfileByIdView(APIView):
             return api_response(False, 'User not found', None, 404, status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+        
+        
+  

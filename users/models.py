@@ -124,3 +124,9 @@ class UserPoints(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.points} points at {self.created_at}"
+    
+    
+    
+    
+    
+    

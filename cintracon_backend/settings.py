@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     'jobopportunities',
     'notesharing',
     'chat',
+    'announcement',
+    'maintenance',
     'corsheaders',
 ]
 

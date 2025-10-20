@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from cloudinary.uploader import upload
 from .models import UserProfile
 from django.core.exceptions import ValidationError
-from .models import UserVerification
+from .models import *
 
 User = get_user_model()
 
@@ -201,4 +201,7 @@ class PasswordResetSerializer(serializers.Serializer):
         if attrs['new_password'] != attrs['new_password_confirmation']:
             raise serializers.ValidationError({'new_password_confirmation': 'Passwords do not match.'})
         return attrs
+
+
+
 
