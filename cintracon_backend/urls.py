@@ -28,5 +28,7 @@ urlpatterns = [
     path('api/note-sharing/', include('notesharing.urls')),
     path('api/chat/', include('chat.urls')),
     path('api/announcement/', include('announcement.urls')),
+    path('api/events/', include('upcomingevents.urls')),
     path('api/maintenance/', include('maintenance.urls')),
+    
 ]

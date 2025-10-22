@@ -9,34 +9,6 @@ from django.db.models import Count, Prefetch
 from rest_framework.pagination import PageNumberPagination
 from users.utils import api_response
 
-# Without dept and semester filter and paginations
-
-# class AllStudentsAPIView(APIView):
-#     permission_classes = [IsAuthenticated]
-    
-#     def get(self, request):
-#         # Get all user profiles with role 'student'
-#         student_profiles = UserProfile.objects.filter(role='student')
-        
-#         # Serialize the data
-#         serializer = StudentProfileSerializer(student_profiles, many=True)
-        
-#         # Prepare the response structure
-#         response_data = {
-#             "msg": "All Student Profile Retrieved Successfully",
-#             "success": True,
-#             "data": serializer.data,
-#             "code": status.HTTP_200_OK
-#         }
-        
-#         return Response(response_data, status=status.HTTP_200_OK)
-
-
-
-
-# New Optimized Code with dept and semester filter
-# views.py (Optimized Query)
-
 
 class StudentPagination(PageNumberPagination):
     page_size = 20

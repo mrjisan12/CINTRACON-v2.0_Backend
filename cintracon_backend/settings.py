@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'chat',
     'announcement',
     'maintenance',
+    'upcomingevents',
     'corsheaders',
 ]
 
@@ -196,7 +197,7 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 
 
-
+# SMTP Email Backend Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('EMAIL_HOST')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
