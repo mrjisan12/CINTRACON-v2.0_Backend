@@ -266,6 +266,7 @@ class RightSidebarInfoView(APIView):
                 u = user_map.get(uid)
                 p = profile_map.get(uid)
                 leaderboard_data.append({
+                    'id': u.id,
                     'full_name': u.full_name if u else None,
                     'profile_photo': p.profile_photo.url if p and p.profile_photo else None,
                     'department': p.department if p else None,
@@ -323,6 +324,7 @@ class DeveloperListView(APIView):
                     'full_name': profile.user.full_name,
                     'profile_photo': profile.profile_photo.url if profile.profile_photo else None,
                     'department': profile.department,
+                    'semester': profile.semester,
                     # প্রয়োজন হলে আরও fields যোগ করুন
                 })
 
