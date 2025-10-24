@@ -140,12 +140,13 @@ class UserLoginView(APIView):
                 email = serializer.validated_data['email']
                 password = serializer.validated_data['password']
                 user = User.objects.filter(email=email).first()
-                userprofile = UserProfile.objects.filter(id=user.id).first()
+                userprofile = UserProfile.objects.filter(user=user).first()
                 if user and user.check_password(password):
                     # Add entry to UserPoints
                     UserPoints.objects.create(user=user, points=5)
                     refresh = RefreshToken.for_user(user)
                     return api_response(True, 'User successfully logged in!', {
+                        'id': user.id,
                         'full_name': user.full_name,
                         'email': user.email,
                         'department': userprofile.department,

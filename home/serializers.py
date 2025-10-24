@@ -68,20 +68,25 @@ class PostSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context['request'].user
         post_image = self.context['request'].FILES.get('post_image')
-        post_image_url = None
+        post = Post.objects.create(
+            caption=validated_data.get('caption', ''),
+            user=user
+        )
 
         if post_image:
             try:
-                cloudinary_response = cloudinary.uploader.upload(post_image)
-                post_image_url = cloudinary_response.get('secure_url')
+                cloudinary_response = cloudinary.uploader.upload(
+                    post_image,
+                    folder="Cintracon/post_images",
+                    public_id=f"post_{post.id}" if hasattr(post, 'id') else None,
+                    overwrite=True
+                    )
+                post.post_image = cloudinary_response.get('secure_url')
+                post.save()
             except Exception as e:
                 print(f"Error uploading image: {str(e)}")
 
-        post = Post.objects.create(
-            caption=validated_data.get('caption', ''),
-            post_image=post_image_url,
-            user=user
-        )
+        
 
         return post
 

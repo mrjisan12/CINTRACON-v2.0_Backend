@@ -38,26 +38,68 @@ class PostCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# class PostListView(APIView):
-#     permission_classes = [IsAuthenticated]
+class PostEditView(APIView):
+    permission_classes = [IsAuthenticated]
 
-#     def get(self, request):
-#         # Get all posts along with their reactions and comments
-#         posts = Post.objects.all()
-        
-#         # Serialize the posts
-#         serializer = PostSerializer(posts, many=True)
-#         pagination_class = PostPagination
-        
-#         return Response(
-#             {
-#                 'msg': 'Posts retrieved successfully!',
-#                 'success': True,
-#                 'data': serializer.data,
-#                 'code': 200
-#             }, status=status.HTTP_200_OK)
-        
-        
+    def post(self, request, post_id):
+        try:
+            post = Post.objects.get(id=post_id)
+        except Post.DoesNotExist:
+            return api_response(False, "Post not found", None, code=404, status_code=404)
+
+        # Only owner can edit
+        if post.user != request.user:
+            return api_response(False, "You are not allowed to edit this post", None, code=403, status_code=403)
+
+        serializer = PostSerializer(post, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            # Handle image upload
+            post_image = request.FILES.get('post_image')
+            if post_image:
+                try:
+                    # Upload to Cloudinary in the same folder and overwrite existing
+                    cloudinary_response = cloudinary.uploader.upload(
+                        post_image,
+                        folder="Cintracon/post_images",
+                        public_id=f"post_{post.id}",  # ensures overwrite
+                        overwrite=True
+                    )
+                    post.post_image = cloudinary_response.get('secure_url')
+                except Exception as e:
+                    return api_response(
+                        False, f"Error uploading image: {str(e)}", None, code=500, status_code=500
+                    )
+
+            # Update caption if provided
+            post.caption = serializer.validated_data.get('caption', post.caption)
+            post.save()
+
+            return api_response(True, "Post updated successfully", PostSerializer(post).data, code=200, status_code=200)
+
+        return api_response(False, "Validation error", serializer.errors, code=400, status_code=400)
+
+
+class PostDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, post_id):
+        try:
+            post = Post.objects.get(id=post_id)
+        except Post.DoesNotExist:
+            return api_response(False, "Post not found", None, code=404, status_code=404)
+
+        # Only owner can delete
+        if post.user != request.user:
+            return api_response(False, "You are not allowed to delete this post", None, code=403, status_code=403)
+
+        try:
+            post.delete()
+            return api_response(True, "Post deleted successfully", None, code=200, status_code=200)
+        except Exception as e:
+            return api_response(False, f"Error deleting post: {str(e)}", None, code=500, status_code=500)
+
+
+
 
 class PostListView(APIView):
     permission_classes = [IsAuthenticated]
