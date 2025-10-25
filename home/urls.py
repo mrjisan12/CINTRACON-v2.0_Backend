@@ -10,6 +10,7 @@ urlpatterns = [
     path('post/comment/<int:post_id>', CommentCreateView.as_view(), name='post_comment'),
     path('post/reaction/<int:post_id>', ReactionCreateView.as_view(), name='post_reaction'),
     path('post/all-comments/<int:post_id>', PostAllCommentsView.as_view(),name="all_comments"),
+    path('post/report/<int:post_id>', ReportCreateView.as_view(), name='post_report'),
     path('right-sidebar-info', RightSidebarInfoView.as_view(), name='right_sidebar_info'),
     path('navbar-info', NavBarInfoView.as_view(), name='nav_bar_info'),
     path('developers', DeveloperListView.as_view(), name='developers_list'),

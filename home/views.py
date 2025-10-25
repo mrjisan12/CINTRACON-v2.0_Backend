@@ -141,7 +141,7 @@ class PostDetailView(APIView):
             }
             # Reactions
             reaction_counts = {
-                "like": post.reactions.filter(reaction_type="like").count(),
+                "haha": post.reactions.filter(reaction_type="haha").count(),
                 "love": post.reactions.filter(reaction_type="love").count(),
                 "sad": post.reactions.filter(reaction_type="sad").count(),
                 "angry": post.reactions.filter(reaction_type="angry").count(),
@@ -223,7 +223,7 @@ class ReactionCreateView(APIView):
 
         # Get the reaction type from the request data
         reaction_type = request.data.get('reaction_type', None)
-        if reaction_type not in ['like', 'love', 'wow', 'sad', 'angry']:
+        if reaction_type not in ['haha', 'love', 'wow', 'sad', 'angry']:
             return Response({"msg": "Invalid reaction type"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Check if the user has already reacted with the same reaction type
@@ -386,3 +386,48 @@ class DeveloperListView(APIView):
                 500, 
                 status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+            
+            
+# Report Post View (To be implemented)
+class ReportCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, post_id):
+        try:
+            post = Post.objects.get(id=post_id)
+        except Post.DoesNotExist:
+            return api_response(False, "Post not found", code=404, status_code=404)
+        
+        # Context তৈরি করছি
+        context = {
+            'request': request,
+            'post': post
+        }
+        
+        serializer = ReportSerializer(data=request.data, context=context)
+        
+        if serializer.is_valid():
+            try:
+                report = serializer.save()
+                return api_response(True, "Post reported successfully", data={
+                    'id': report.id,
+                    'report_type': report.report_type,
+                    'reason': report.reason
+                }, code=201)
+            except serializers.ValidationError as e:
+                # Better error message extraction
+                if hasattr(e, 'detail'):
+                    if isinstance(e.detail, list) and len(e.detail) > 0:
+                        error_message = str(e.detail[0])
+                    elif isinstance(e.detail, dict):
+                        # যদি dictionary format এ error থাকে
+                        first_error = list(e.detail.values())[0]
+                        error_message = str(first_error[0]) if isinstance(first_error, list) else str(first_error)
+                    else:
+                        error_message = str(e.detail)
+                else:
+                    error_message = str(e)
+                return api_response(False, error_message, code=400, status_code=400)
+        
+        # Serializer errors return করছি
+        return api_response(False, "Invalid data", data=serializer.errors, code=400, status_code=400)

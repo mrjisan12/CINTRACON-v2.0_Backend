@@ -23,7 +23,7 @@ class Post(models.Model):
 # Reaction Model
 class Reaction(models.Model):
     REACTION_CHOICES = [
-        ('like', 'Like'),
+        ('haha', 'Haha'),
         ('love', 'Love'),
         ('wow', 'Wow'),
         ('sad', 'Sad'),
@@ -51,3 +51,27 @@ class Comment(models.Model):
 
     def __str__(self):
         return f"Comment by {self.user.full_name} on post {self.post.id}"
+
+
+
+# Report Model
+class Report(models.Model):
+    REPORT_TYPES = [
+        ('spam', 'Spam'),
+        ('harassment', 'Harassment'),
+        ('misinformation', 'Misinformation'),
+        ('inappropriate_content', 'Inappropriate Content'),
+        ('other', 'Other'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reports")
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="reports")
+    report_type = models.CharField(max_length=50, choices=REPORT_TYPES)
+    reason = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['user', 'post'] 
+    
+    def __str__(self):
+        return f"Report by {self.user.full_name} on post {self.post.id}"

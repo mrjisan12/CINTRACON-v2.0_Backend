@@ -1,7 +1,7 @@
 # serializers.py
 import cloudinary.uploader
 from rest_framework import serializers
-from .models import Post, Reaction, Comment
+from .models import *
 #from django.contrib.auth.models import User
 from django.contrib.auth import get_user_model
 
@@ -51,7 +51,7 @@ class PostSerializer(serializers.ModelSerializer):
 
     def get_reaction(self, obj):
         reaction_counts = {
-            "like": obj.reactions.filter(reaction_type="like").count(),
+            "haha": obj.reactions.filter(reaction_type="haha").count(),
             "love": obj.reactions.filter(reaction_type="love").count(),
             "sad": obj.reactions.filter(reaction_type="sad").count(),
             "angry": obj.reactions.filter(reaction_type="angry").count(),
@@ -91,69 +91,36 @@ class PostSerializer(serializers.ModelSerializer):
         return post
 
 
-# Trying to add field post_detail in NewsFeed API
-
-# class PostSerializer(serializers.ModelSerializer):
-#     reaction = serializers.SerializerMethodField()
-#     comments = serializers.SerializerMethodField()
-#     total_comments = serializers.SerializerMethodField()
-#     post_image = serializers.SerializerMethodField()
-#     user = UserProfileSerializer()  # Add user information
-#     post_detail = serializers.SerializerMethodField()  # Add post_detail field
-
-#     class Meta:
-#         model = Post
-#         fields = ['id', 'user', 'post_detail','post_image', 'reaction', 'comments', 'total_comments']  # Ensure all fields are included
-
-#     def get_post_image(self, obj):
-#         if obj.post_image:
-#             return str(obj.post_image)
-#         return None
-
-#     def get_reaction(self, obj):
-#         # Count reactions for each type
-#         reaction_counts = {
-#             "like": obj.reactions.filter(reaction_type="like").count(),
-#             "love": obj.reactions.filter(reaction_type="love").count(),
-#             "sad": obj.reactions.filter(reaction_type="sad").count(),
-#             "angry": obj.reactions.filter(reaction_type="angry").count(),
-#         }
-#         return reaction_counts
-
-#     def get_comments(self, obj):
-#         # Get all comments for the post and serialize them
-#         comments = obj.comments.all().order_by('-created_at')  # Get comments in descending order
-#         return CommentSerializer(comments, many=True).data
-
-#     def get_total_comments(self, obj):
-#         # Get total number of comments
-#         return obj.comments.count()
-
-#     def get_post_detail(self, obj):
-#         # This method combines all relevant data into the post_detail field
-#         return {
-#             'caption': obj.caption,
-#             'post_image': self.get_post_image(obj),
-#             'reaction': self.get_reaction(obj),
-#             'comments': self.get_comments(obj),
-#             'total_comments': self.get_total_comments(obj),
-#             'created_at': obj.created_at,
-#         }
-
-#     def create(self, validated_data):
-#         post_image = validated_data.get('post_image', None)
-#         post_image_url = None
-
-#         # If post_image is provided, upload to Cloudinary and get the correct URL
-#         if post_image:
-#             cloudinary_response = cloudinary.uploader.upload(post_image)
-#             post_image_url = cloudinary_response.get('secure_url')  # Get the full Cloudinary URL
-
-#         # Create the post and assign the user as well
-#         post = Post.objects.create(
-#             caption=validated_data['caption'],
-#             post_image=post_image_url if post_image else None,  # Store the correct Cloudinary URL
-#             user=validated_data.get('user'),  # Assign the user to the post
-#         )
-
-#         return post
+class ReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Report
+        fields = ['report_type', 'reason']
+    
+    def create(self, validated_data):
+        user = self.context['request'].user
+        post = self.context.get('post')
+        
+        if not post:
+            raise serializers.ValidationError("Post not found in context")
+        
+        # Check if user already reported this post
+        if Report.objects.filter(user=user, post=post).exists():
+            raise serializers.ValidationError("You have already reported this post.")
+        
+        # Check if user is reporting their own post
+        if post.user == user:
+            raise serializers.ValidationError("You cannot report your own post.")
+        
+        report = Report.objects.create(
+            user=user,
+            post=post,
+            **validated_data
+        )
+        return report
+    
+    def validate_report_type(self, value):
+        # Report type validation
+        valid_types = ['spam', 'harassment', 'misinformation', 'inappropriate_content', 'other']
+        if value.lower() not in valid_types:
+            raise serializers.ValidationError("Invalid report type")
+        return value.lower()
