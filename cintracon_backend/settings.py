@@ -209,7 +209,7 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
 
 # AI Configuration
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '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')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PDF_FILE_PATH = os.path.join(BASE_DIR, 'documents', 'Cintracon_AI.pdf')  # Adjust path as needed
 
 # PDF file existence check
