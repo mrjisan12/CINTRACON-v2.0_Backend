@@ -14,4 +14,8 @@ urlpatterns = [
     path('right-sidebar-info', RightSidebarInfoView.as_view(), name='right_sidebar_info'),
     path('navbar-info', NavBarInfoView.as_view(), name='nav_bar_info'),
     path('developers', DeveloperListView.as_view(), name='developers_list'),
+    path('post/bookmark/<int:post_id>', BookmarkToggleView.as_view(), name='post_bookmark'),
+    path('my-bookmarks', MyBookmarksView.as_view(), name='my_bookmarks'),
+    path('search', GlobalSearchView.as_view(), name='global_search'),
+    path('post/public/<int:post_id>/', PublicPostDetailView.as_view(), name='post_public_detail'),
 ]

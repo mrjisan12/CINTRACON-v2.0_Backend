@@ -27,15 +27,19 @@ class CustomUserManager(BaseUserManager):
 
 
 class CustomUser(AbstractUser):
-    username = None  # Remove the username field
-    email = models.EmailField(unique=True)  # Make email unique
-    full_name = models.CharField(max_length=255)  # Add full_name field
+    username = None
+    email = models.EmailField(unique=True)
+    full_name = models.CharField(max_length=255)
+    is_email_verified = models.BooleanField(default=False)
 
-    # Set the email field as the unique identifier
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['full_name']  # Make full_name a required field
+    REQUIRED_FIELDS = ['full_name']
 
     objects = CustomUserManager()
+
+    @property
+    def name(self):
+        return self.full_name
 
     def __str__(self):
         return self.email
@@ -105,7 +109,7 @@ class UserProfile(models.Model):
 
 
 class UserVerification(models.Model):
-    email = models.EmailField()
+    email = models.EmailField(unique=True)
     otp_code = models.CharField(max_length=6)
     expired_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -124,6 +128,18 @@ class UserPoints(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.points} points at {self.created_at}"
+
+
+class Follow(models.Model):
+    follower = models.ForeignKey('CustomUser', on_delete=models.CASCADE, related_name='following')
+    following = models.ForeignKey('CustomUser', on_delete=models.CASCADE, related_name='followers')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['follower', 'following']
+
+    def __str__(self):
+        return f"{self.follower.full_name} → {self.following.full_name}"
     
     
     

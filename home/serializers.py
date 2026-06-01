@@ -35,14 +35,19 @@ class CommentSerializer(serializers.ModelSerializer):
 
 class PostSerializer(serializers.ModelSerializer):
     reaction = serializers.SerializerMethodField()
-    # comments = serializers.SerializerMethodField()
     total_comments = serializers.SerializerMethodField()
     post_image = serializers.SerializerMethodField()
     user = UserProfileSerializer(read_only=True)
+    user_reaction = serializers.SerializerMethodField()
+    is_bookmarked = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
-        fields = ['id', 'user', 'caption', 'post_image', 'reaction', 'total_comments', 'created_at']
+        fields = [
+            'id', 'user', 'caption', 'post_image', 'is_pinned',
+            'reaction', 'user_reaction', 'is_bookmarked',
+            'total_comments', 'created_at',
+        ]
 
     def get_post_image(self, obj):
         if obj.post_image:
@@ -50,17 +55,25 @@ class PostSerializer(serializers.ModelSerializer):
         return None
 
     def get_reaction(self, obj):
-        reaction_counts = {
-            "haha": obj.reactions.filter(reaction_type="haha").count(),
-            "love": obj.reactions.filter(reaction_type="love").count(),
-            "sad": obj.reactions.filter(reaction_type="sad").count(),
-            "angry": obj.reactions.filter(reaction_type="angry").count(),
+        return {
+            'haha':  obj.reactions.filter(reaction_type='haha').count(),
+            'love':  obj.reactions.filter(reaction_type='love').count(),
+            'sad':   obj.reactions.filter(reaction_type='sad').count(),
+            'angry': obj.reactions.filter(reaction_type='angry').count(),
         }
-        return reaction_counts
 
-    # def get_comments(self, obj):
-    #     comments = obj.comments.all().order_by('-created_at')[:2]
-    #     return CommentSerializer(comments, many=True).data
+    def get_user_reaction(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        r = obj.reactions.filter(user=request.user).first()
+        return r.reaction_type if r else None
+
+    def get_is_bookmarked(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.bookmarks.filter(user=request.user).exists()
 
     def get_total_comments(self, obj):
         return obj.comments.count()

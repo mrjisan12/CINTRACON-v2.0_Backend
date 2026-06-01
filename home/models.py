@@ -11,6 +11,7 @@ class Post(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts")
     caption = models.TextField(null=True, blank=True)
     post_image = CloudinaryField('post_image', null=True, blank=True)
+    is_pinned = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -64,10 +65,17 @@ class Report(models.Model):
         ('other', 'Other'),
     ]
     
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('resolved', 'Resolved'),
+        ('dismissed', 'Dismissed'),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reports")
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="reports")
     report_type = models.CharField(max_length=50, choices=REPORT_TYPES)
     reason = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -75,3 +83,16 @@ class Report(models.Model):
     
     def __str__(self):
         return f"Report by {self.user.full_name} on post {self.post.id}"
+
+
+class Bookmark(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookmarks')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='bookmarks')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'post']
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.full_name} bookmarked post {self.post.id}"

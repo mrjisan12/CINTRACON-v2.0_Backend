@@ -5,4 +5,4 @@ from rest_framework import serializers
 class MaintenanceStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaintenanceStatus
-        fields = ['status', 'reason', 'created_at']
+        fields = ['id', 'status', 'reason', 'created_at']

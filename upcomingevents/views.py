@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import EventSerializer, EventInterestSerializer
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Event, EventInterest
 from .utils import api_response
 
@@ -183,6 +183,30 @@ class EventDeleteView(APIView):
             )
 
 
+class UserInterestedEventsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            page = int(request.data.get('page', 1))
+            size = int(request.data.get('size', 10))
+
+            interests = EventInterest.objects.filter(user=request.user).select_related('event').order_by('-created_at')
+            total = interests.count()
+            start = (page - 1) * size
+            end = start + size
+            paginated = interests[start:end]
+
+            serializer = EventSerializer(
+                [i.event for i in paginated],
+                many=True,
+                context={'request': request}
+            )
+            return api_response(True, 'Interested events fetched successfully!', serializer.data, 200, status.HTTP_200_OK)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class EventInterestView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -217,25 +241,44 @@ class EventInterestView(APIView):
                 {
                     'is_interested': is_interested,
                     'total_interested': total_interested
-                }, 
-                200, 
+                },
+                200,
                 status.HTTP_200_OK
             )
-            
+
         except Event.DoesNotExist:
-            return api_response(
-                False, 
-                'Event not found', 
-                None, 
-                404, 
-                status.HTTP_404_NOT_FOUND
-            )
+            return api_response(False, 'Event not found', None, 404, status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return api_response(
-                False, 
-                f'Server error: {str(e)}', 
-                None, 
-                500, 
-                status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PublicEventDetailView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, event_id):
+        try:
+            event = Event.objects.select_related('user__profile').get(id=event_id)
+            profile = event.user.profile
+            data = {
+                'id': event.id,
+                'title': event.title,
+                'description': event.description,
+                'event_type': event.event_type,
+                'event_organizer': event.event_organizer,
+                'date': event.date,
+                'location': event.location,
+                'event_image': str(event.event_image) if event.event_image else None,
+                'total_interested': event.total_interested,
+                'created_at': event.created_at,
+                'user': {
+                    'id': event.user.id,
+                    'full_name': event.user.full_name,
+                    'profile_photo': profile.profile_photo.url if profile.profile_photo else None,
+                },
+            }
+            return api_response(True, 'Event details fetched successfully!', data, 200, status.HTTP_200_OK)
+        except Event.DoesNotExist:
+            return api_response(False, 'Event not found', None, 404, status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
 

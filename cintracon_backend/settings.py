@@ -18,6 +18,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import cloudinary
+import dj_database_url
 from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -28,12 +29,31 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-cf5u3o&-#r@+et#pl(*^qq=0&c8t7i-z-#$ikq4ad)-@^caf+a'
+SECRET_KEY = os.getenv(
+    'SECRET_KEY',
+    'django-insecure-cf5u3o&-#r@+et#pl(*^qq=0&c8t7i-z-#$ikq4ad)-@^caf+a'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+IS_RAILWAY = bool(os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RAILWAY_PUBLIC_DOMAIN'))
+DEBUG = os.getenv('DEBUG', 'False' if IS_RAILWAY else 'True').lower() in ('1', 'true', 'yes', 'on')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv('ALLOWED_HOSTS', '').split(',')
+    if host.strip()
+]
+
+RAILWAY_PUBLIC_DOMAIN = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+if RAILWAY_PUBLIC_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+
+RAILWAY_PRIVATE_DOMAIN = os.getenv('RAILWAY_PRIVATE_DOMAIN')
+if RAILWAY_PRIVATE_DOMAIN:
+    ALLOWED_HOSTS.append(RAILWAY_PRIVATE_DOMAIN)
+
+if DEBUG:
+    ALLOWED_HOSTS += ['localhost', '127.0.0.1']
 
 
 # Application definition
@@ -58,6 +78,10 @@ INSTALLED_APPS = [
     'maintenance',
     'upcomingevents',
     'corsheaders',
+    'cloudinary_storage',
+    'channels',
+    'admin_panel',
+    'notifications',
 ]
 
 AUTH_USER_MODEL = 'users.CustomUser'
@@ -69,6 +93,19 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '20/min',
+        'user': '200/min',
+        'login': '5/min',
+        'signup': '3/hour',
+        'post_create': '30/min',
+        'otp': '5/min',
+    },
+    'EXCEPTION_HANDLER': 'users.exceptions.custom_exception_handler',
 }
 
 # Development-specific token lifetimes
@@ -84,6 +121,7 @@ SIMPLE_JWT = {
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -110,6 +148,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'cintracon_backend.wsgi.application'
+ASGI_APPLICATION = 'cintracon_backend.asgi.application'
 
 
 # Database
@@ -122,16 +161,27 @@ WSGI_APPLICATION = 'cintracon_backend.wsgi.application'
 #     }
 # }
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'cintracon_db',  # Your database name
-        'USER': 'postgres',  # Your PostgreSQL user
-        'PASSWORD': '1234',  # Your PostgreSQL password
-        'HOST': 'localhost',
-        'PORT': '5432',  # Default PostgreSQL port
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=not DEBUG,
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'cintracon_db'),
+            'USER': os.getenv('DB_USER', 'postgres'),
+            'PASSWORD': os.getenv('DB_PASSWORD', '1234'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
+    }
 
 
 # Password validation
@@ -169,6 +219,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -177,20 +229,95 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 
-# Localhost ke allow koro
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",   # React local dev server
-]
-
 CORS_ALLOW_CREDENTIALS = True
 
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',')
+    if origin.strip()
+]
+
+if DEBUG:
+    CORS_ALLOWED_ORIGINS += [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')
+    if origin.strip()
+]
+
+if RAILWAY_PUBLIC_DOMAIN:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RAILWAY_PUBLIC_DOMAIN}")
+
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS += [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
+
+# Redis — optional. Falls back to memory cache if Redis is not running.
+REDIS_URL = os.getenv('REDIS_URL', '')
+
+def _redis_available(url):
+    if not url:
+        return False
+    try:
+        import redis
+        r = redis.from_url(url, socket_connect_timeout=1)
+        r.ping()
+        return True
+    except Exception:
+        return False
+
+REDIS_RUNNING = _redis_available(REDIS_URL)
+
+if REDIS_RUNNING:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+            "TIMEOUT": 300,
+        }
+    }
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [REDIS_URL]},
+        }
+    }
+    CELERY_BROKER_URL = REDIS_URL
+    CELERY_RESULT_BACKEND = REDIS_URL
+else:
+    # Dev fallback — works without Redis server
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
+    CELERY_BROKER_URL = 'memory://'
+    CELERY_RESULT_BACKEND = 'cache+memory://'
+
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
 
 
 # Cloudinary settings
 cloudinary.config(
-    cloud_name="djadym7mg",
-    api_key="118963914939663",
-    api_secret="iW82aEGV-k7wBynTH8AUICv4AbE"
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME", "djadym7mg"),
+    api_key=os.getenv("CLOUDINARY_API_KEY", "118963914939663"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET", "iW82aEGV-k7wBynTH8AUICv4AbE")
 )
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
@@ -203,7 +330,8 @@ EMAIL_HOST = os.getenv('EMAIL_HOST')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
-EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False') == 'True'
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
 
@@ -214,7 +342,7 @@ PDF_FILE_PATH = os.path.join(BASE_DIR, 'documents', 'Cintracon_AI.pdf')  # Adjus
 
 # PDF file existence check
 if not os.path.exists(PDF_FILE_PATH):
-    print(f"⚠️ Warning: PDF file not found at {PDF_FILE_PATH}")
-    print("🔄 AI will work in fallback mode without PDF context")
+    print(f"[WARNING] PDF file not found at {PDF_FILE_PATH}")
+    print("[INFO] AI will work in fallback mode without PDF context")
 else:
-    print(f"✅ PDF file found at: {PDF_FILE_PATH}") 
+    print(f"[OK] PDF file found at: {PDF_FILE_PATH}")

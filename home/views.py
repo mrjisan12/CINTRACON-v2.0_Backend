@@ -2,7 +2,7 @@
 # home/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from users.models import CustomUser, UserProfile, UserPoints
 from users.utils import api_response
 from django.utils import timezone
@@ -74,7 +74,7 @@ class PostEditView(APIView):
             post.caption = serializer.validated_data.get('caption', post.caption)
             post.save()
 
-            return api_response(True, "Post updated successfully", PostSerializer(post).data, code=200, status_code=200)
+            return api_response(True, "Post updated successfully", PostSerializer(post, context={'request': request}).data, code=200, status_code=200)
 
         return api_response(False, "Validation error", serializer.errors, code=400, status_code=400)
 
@@ -115,7 +115,7 @@ class PostListView(APIView):
         end = start + size
         paginated_posts = posts[start:end]
 
-        serializer = PostSerializer(paginated_posts, many=True)
+        serializer = PostSerializer(paginated_posts, many=True, context={'request': request})
 
         return Response({
             'msg': 'Posts retrieved successfully!',
@@ -191,14 +191,22 @@ class CommentCreateView(APIView):
         if not comment_content:
             return Response({"msg": "Comment content cannot be empty"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create a new comment
-        comment = Comment.objects.create(
-            user=request.user,  # Associate the logged-in user
-            post=post,           # Associate the post with the comment
-            content=comment_content  # The content of the comment
-        )
+        comment = Comment.objects.create(user=request.user, post=post, content=comment_content)
 
-        # Return the serialized comment data
+        # Notify post owner
+        if post.user != request.user:
+            try:
+                from notifications.utils import create_notification
+                create_notification(
+                    recipient=post.user,
+                    sender=request.user,
+                    notif_type='comment',
+                    message=f'{request.user.full_name} commented on your post.',
+                    link=f'/home/post/{post.id}',
+                )
+            except Exception:
+                pass
+
         serializer = CommentSerializer(comment)
         return Response({
             "msg": "Comment created successfully",
@@ -210,37 +218,61 @@ class CommentCreateView(APIView):
         
         
         
-# For Giving Reaction 
+# For Giving Reaction
 class ReactionCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, post_id):
-        # Get the post the user is reacting to
         try:
             post = Post.objects.get(id=post_id)
         except Post.DoesNotExist:
-            return Response({"msg": "Post not found"}, status=status.HTTP_404_NOT_FOUND)
+            return api_response(False, 'Post not found', None, 404, status.HTTP_404_NOT_FOUND)
 
-        # Get the reaction type from the request data
-        reaction_type = request.data.get('reaction_type', None)
+        reaction_type = request.data.get('reaction_type')
         if reaction_type not in ['haha', 'love', 'wow', 'sad', 'angry']:
-            return Response({"msg": "Invalid reaction type"}, status=status.HTTP_400_BAD_REQUEST)
+            return api_response(False, 'Invalid reaction type', None, 400, status.HTTP_400_BAD_REQUEST)
 
-        # Check if the user has already reacted with the same reaction type
-        existing_reaction = Reaction.objects.filter(user=request.user, post=post)
+        existing = Reaction.objects.filter(user=request.user, post=post).first()
+        user_reaction = None
 
-        if existing_reaction.exists():
-            current_reaction = existing_reaction.first()
-            # If the reaction type is the same, do nothing
-            if current_reaction.reaction_type == reaction_type:
-                return Response({"msg": "You already reacted with this type"}, status=status.HTTP_200_OK)
-            # Otherwise, update the reaction
-            existing_reaction.update(reaction_type=reaction_type)
-            return Response({"msg": "Reaction updated successfully"}, status=status.HTTP_200_OK)
+        if existing:
+            if existing.reaction_type == reaction_type:
+                # Same type → toggle OFF
+                existing.delete()
+                user_reaction = None
+            else:
+                # Different type → switch
+                existing.reaction_type = reaction_type
+                existing.save(update_fields=['reaction_type'])
+                user_reaction = reaction_type
         else:
-            # If the user has not reacted yet, create a new reaction
+            # No previous reaction → create
             Reaction.objects.create(user=request.user, post=post, reaction_type=reaction_type)
-            return Response({"msg": "Reaction added successfully"}, status=status.HTTP_201_CREATED)
+            user_reaction = reaction_type
+
+            if post.user != request.user:
+                try:
+                    from notifications.utils import create_notification
+                    create_notification(
+                        recipient=post.user,
+                        sender=request.user,
+                        notif_type='like',
+                        message=f'{request.user.full_name} reacted to your post.',
+                        link=f'/home/post/{post.id}',
+                    )
+                except Exception:
+                    pass
+
+        reaction_counts = {
+            'haha':  post.reactions.filter(reaction_type='haha').count(),
+            'love':  post.reactions.filter(reaction_type='love').count(),
+            'sad':   post.reactions.filter(reaction_type='sad').count(),
+            'angry': post.reactions.filter(reaction_type='angry').count(),
+        }
+        return api_response(True, 'Reaction updated.', {
+            'reaction': reaction_counts,
+            'user_reaction': user_reaction,
+        }, 200, status.HTTP_200_OK)
 
 
 
@@ -431,3 +463,172 @@ class ReportCreateView(APIView):
         
         # Serializer errors return করছি
         return api_response(False, "Invalid data", data=serializer.errors, code=400, status_code=400)
+
+
+# ─── Bookmarks ────────────────────────────────────────────────────────────────
+
+class BookmarkToggleView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, post_id):
+        try:
+            post = Post.objects.get(id=post_id)
+            bm = Bookmark.objects.filter(user=request.user, post=post)
+            if bm.exists():
+                bm.delete()
+                return api_response(True, 'Bookmark removed.', {'is_bookmarked': False}, 200, status.HTTP_200_OK)
+            else:
+                Bookmark.objects.create(user=request.user, post=post)
+                return api_response(True, 'Post bookmarked.', {'is_bookmarked': True}, 200, status.HTTP_200_OK)
+        except Post.DoesNotExist:
+            return api_response(False, 'Post not found.', None, 404, status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class MyBookmarksView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            page = int(request.query_params.get('page', 1))
+            size = int(request.query_params.get('size', 10))
+
+            bms = Bookmark.objects.filter(user=request.user).select_related('post')
+            total = bms.count()
+            start = (page - 1) * size
+            posts = [bm.post for bm in bms[start:start + size]]
+            return api_response(True, 'Bookmarks fetched.', PostSerializer(posts, many=True, context={'request': request}).data, 200, status.HTTP_200_OK,
+                                pagination={'total': total, 'page': page, 'size': size,
+                                            'total_pages': (total + size - 1) // size if size else 1})
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ─── Global Search ────────────────────────────────────────────────────────────
+
+class GlobalSearchView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            from django.db.models import Q as DQ
+            from users.models import CustomUser, UserProfile
+            from notesharing.models import Note
+            from jobopportunities.models import JobPost
+
+            q = request.query_params.get('q', '').strip()
+            search_type = request.query_params.get('type', 'all')
+            limit = 5
+
+            if not q:
+                return api_response(False, 'Query parameter "q" is required.', None, 400, status.HTTP_400_BAD_REQUEST)
+
+            result = {}
+
+            if search_type in ('all', 'users'):
+                profiles = UserProfile.objects.filter(
+                    DQ(user__full_name__icontains=q) | DQ(user__email__icontains=q)
+                ).select_related('user')[:limit]
+                result['users'] = [
+                    {
+                        'id': p.user.id,
+                        'name': p.user.full_name,
+                        'profile_photo': p.profile_photo.url if p.profile_photo else None,
+                        'department': p.department,
+                        'semester': p.semester,
+                        'batch_no': p.batch_no,
+                    }
+                    for p in profiles
+                ]
+
+            if search_type in ('all', 'posts'):
+                posts = Post.objects.filter(caption__icontains=q).select_related('user')[:limit]
+                result['posts'] = [
+                    {
+                        'id': p.id,
+                        'content': p.caption[:120] if p.caption else '',
+                        'author': p.user.full_name,
+                        'created_at': p.created_at,
+                    }
+                    for p in posts
+                ]
+
+            if search_type in ('all', 'notes'):
+                notes = Note.objects.filter(
+                    DQ(title__icontains=q) | DQ(description__icontains=q)
+                ).select_related('user')[:limit]
+                result['notes'] = [
+                    {
+                        'id': n.id,
+                        'title': n.title,
+                        'department': n.department,
+                        'uploaded_by': n.user.full_name,
+                    }
+                    for n in notes
+                ]
+
+            if search_type in ('all', 'jobs'):
+                jobs = JobPost.objects.filter(
+                    DQ(title__icontains=q) | DQ(company_name__icontains=q)
+                )[:limit]
+                result['jobs'] = [
+                    {
+                        'id': j.id,
+                        'title': j.title,
+                        'company_name': j.company_name,
+                        'deadline': j.deadline,
+                    }
+                    for j in jobs
+                ]
+
+            return api_response(True, 'Search results.', result, 200, status.HTTP_200_OK)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ─── Public Detail (no auth required — for share links) ──────────────────────
+
+class PublicPostDetailView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, post_id):
+        try:
+            post = Post.objects.select_related('user__profile').prefetch_related(
+                'comments__user__profile', 'reactions'
+            ).get(id=post_id)
+
+            profile = post.user.profile
+            comments = [
+                {
+                    'id': c.id,
+                    'content': c.content,
+                    'created_at': c.created_at,
+                    'user': {
+                        'id': c.user.id,
+                        'full_name': c.user.full_name,
+                        'profile_photo': c.user.profile.profile_photo.url if c.user.profile.profile_photo else None,
+                    },
+                }
+                for c in post.comments.select_related('user__profile').order_by('-created_at')
+            ]
+            data = {
+                'id': post.id,
+                'caption': post.caption,
+                'post_image': str(post.post_image) if post.post_image else None,
+                'created_at': post.created_at,
+                'reaction_count': post.reactions.count(),
+                'comment_count': post.comments.count(),
+                'comments': comments,
+                'user': {
+                    'id': post.user.id,
+                    'full_name': post.user.full_name,
+                    'profile_photo': profile.profile_photo.url if profile.profile_photo else None,
+                    'department': profile.department,
+                },
+            }
+            return api_response(True, 'Post details fetched successfully!', data, 200, status.HTTP_200_OK)
+        except Post.DoesNotExist:
+            return api_response(False, 'Post not found', None, 404, status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)

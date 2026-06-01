@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import JobPostSerializer
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import *
 from rest_framework.pagination import PageNumberPagination
 from .utils import api_response
@@ -116,9 +116,34 @@ class JobPostDeleteView(APIView):
             )
         except Exception as e:
             return api_response(
-                False, 
-                f'Server error: {str(e)}', 
-                None, 
-                500, 
+                False,
+                f'Server error: {str(e)}',
+                None,
+                500,
                 status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class PublicJobDetailView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, job_id):
+        try:
+            job = JobPost.objects.get(id=job_id)
+            data = {
+                'id': job.id,
+                'title': job.title,
+                'description': job.description,
+                'company_name': job.company_name,
+                'salary': job.salary,
+                'place': job.place,
+                'apply_link': job.apply_link,
+                'deadline': job.deadline,
+                'created_at': job.created_at,
+                'job_post_image': str(job.job_post_image) if job.job_post_image else None,
+            }
+            return api_response(True, 'Job details fetched successfully!', data, 200, status.HTTP_200_OK)
+        except JobPost.DoesNotExist:
+            return api_response(False, 'Job not found', None, 404, status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)

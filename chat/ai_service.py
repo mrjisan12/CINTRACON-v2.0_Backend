@@ -73,17 +73,17 @@ class CintraconAIService:
                 | StrOutputParser()
             )
             
-            print("✅ AI Service initialized successfully with PDF!")
-            
+            print("[OK] AI Service initialized successfully with PDF!")
+
         except Exception as e:
-            print(f"❌ AI initialization error: {e}")
+            print(f"[ERROR] AI initialization error: {e}")
             self._create_fallback_chain()
 
     def _create_fallback_chain(self):
         """Create a fallback chain without PDF for basic functionality"""
         try:
-            print("🔄 Creating fallback AI chain...")
-            
+            print("[INFO] Creating fallback AI chain...")
+
             self.model = ChatOpenAI(
                 model_name="gpt-4",
                 openai_api_key=self.openai_api_key,
@@ -112,10 +112,10 @@ class CintraconAIService:
                 | StrOutputParser()
             )
             
-            print("✅ Fallback AI chain created!")
-            
+            print("[OK] Fallback AI chain created!")
+
         except Exception as e:
-            print(f"❌ Fallback chain creation failed: {e}")
+            print(f"[ERROR] Fallback chain creation failed: {e}")
             self.chain = None
 
     def get_ai_response(self, question):
@@ -130,7 +130,7 @@ class CintraconAIService:
             return response.strip()
             
         except Exception as e:
-            print(f"❌ AI response error: {e}")
+            print(f"[ERROR] AI response error: {e}")
             # Fallback response
             return "I apologize, but I'm having trouble processing your request right now. Please try again later."
 

@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Note
 from .serializers import NoteSerializer
 from rest_framework.pagination import PageNumberPagination
@@ -150,26 +150,54 @@ class NoteDeleteView(APIView):
         
         
         
- # Download count increase API view       
+ # Download count increase API view
 class IncreaseDownloadCountView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, note_id):
         try:
             note = get_object_or_404(Note, id=note_id)
-            
+
             # Increase download count
             note.total_downloads += 1
             note.save()
-            
+
             return api_response(
-                True, 
-                'Download count increased successfully!', 
-                {'total_downloads': note.total_downloads}, 
-                200, 
+                True,
+                'Download count increased successfully!',
+                {'total_downloads': note.total_downloads},
+                200,
                 status.HTTP_200_OK
             )
-            
+
+        except Note.DoesNotExist:
+            return api_response(False, 'Note not found', None, 404, status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return api_response(False, f'Server error: {str(e)}', None, 500, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PublicNoteDetailView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, note_id):
+        try:
+            note = Note.objects.select_related('user__profile').get(id=note_id)
+            file_url = note.drive_link or (str(note.note_file) if note.note_file else None)
+            data = {
+                'id': note.id,
+                'title': note.title,
+                'description': note.description,
+                'file': file_url,
+                'department': note.department,
+                'semester': note.semester,
+                'created_at': note.uploaded_at,
+                'uploader': {
+                    'id': note.user.id,
+                    'full_name': note.user.full_name,
+                    'profile_photo': note.user.profile.profile_photo.url if note.user.profile.profile_photo else None,
+                },
+            }
+            return api_response(True, 'Note details fetched successfully!', data, 200, status.HTTP_200_OK)
         except Note.DoesNotExist:
             return api_response(False, 'Note not found', None, 404, status.HTTP_404_NOT_FOUND)
         except Exception as e:
