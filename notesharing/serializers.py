@@ -34,12 +34,11 @@ class NoteSerializer(serializers.ModelSerializer):
             if 'res.cloudinary.com' in url:
                 # Check if it's missing the proper path structure
                 if '/v' in url and '/raw/upload/' not in url:
-                    # Convert from: https://res.cloudinary.com/djadym7mg/v1760861568/ifbmsd3swgbf2vjyqbnr.pdf
-                    # To: https://res.cloudinary.com/djadym7mg/raw/upload/v1760861568/ifbmsd3swgbf2vjyqbnr.pdf
+                    # Convert Cloudinary raw file URLs to include /raw/upload/ after the cloud name.
                     parts = url.split('/v')
                     if len(parts) == 2:
-                        base = parts[0]  # https://res.cloudinary.com/djadym7mg
-                        version_and_file = parts[1]  # 1760861568/ifbmsd3swgbf2vjyqbnr.pdf
+                        base = parts[0]
+                        version_and_file = parts[1]
                         url = f"{base}/raw/upload/v{version_and_file}"
                 
                 # Remove any existing fl_attachment parameter (causing 401)
